@@ -14,17 +14,45 @@ BOTTOM = 200
 STEP = 10
 
 
-def within_bounds(x, y):
-    return (LEFT <= x <= RIGHT
-            and TOP <= y <= BOTTOM)
+class Scout:
+    def __init__(self, pos: tuple[float, float], heading):
+        t = trtl.Turtle(visible=False)
+        speed_init = t.speed()
+        t.speed(0)
+        t.up()
+        t.setpos(*pos)
+        t.setheading(heading)
+        t.speed(speed_init)
+        t.color("grey")
+
+        self.scout = t
+
+    def way_free(self) -> bool:
+        self.scout.forward(STEP)
+        free = free_field(*self.scout.pos())
+        self.scout.undo()
+        return free
+
+    def make_wall(self, return_home=True) -> None:
+        # get into position
+        self.scout.fd(STEP * .5)
+        self.scout.right(90)
+        self.scout.fd(STEP * .5)
+
+        # draw wall
+        self.scout.down()
+        self.scout.bk(STEP)
+
+        if return_home:
+            # return to origin
+            for _ in range(4):
+                self.scout.undo()
 
 
 def free_field(x: float, y: float) -> bool:
-    # FIXME: allows to cross outer bounds by 1 step
-
     x = round(x)
     y = round(y)
-    if not (LEFT <= x <= RIGHT and TOP <= y <= BOTTOM):
+    if not (LEFT < x < RIGHT and TOP < y < BOTTOM):
         return False
 
     for p_x, p_y in waypoints:
@@ -33,29 +61,20 @@ def free_field(x: float, y: float) -> bool:
     return True
 
 
-def spawn_turtle(x, y, heading=0):
-    t = trtl.Turtle(visible=False)
-    speed_init = t.speed()
-    t.speed(0)
-    t.up()
-    t.setpos(x, y)
-    t.setheading(heading)
-    t.speed(speed_init)
-    t.down()
-    return t
-
-
-def move(t: trtl.Turtle):
+def move(t: trtl.Turtle) -> None:
     # TODO: Find better way to navigate with precision and awareness.
+
+    t.fd(STEP)
+    waypoints.add((round(t.xcor()), round(t.ycor())))
+
     turns = [-90, 0, 90]
     random.shuffle(turns)
 
     for turn in turns:
-        waypoints.add((round(t.xcor()), round(t.ycor())))
         t.right(turn)
-        t.forward(STEP)
+        scout = Scout(t.pos(), t.heading())
 
-        if free_field(*t.pos()):
+        if scout.way_free():
             try:
                 move(t)
             except RecursionError:
@@ -66,30 +85,14 @@ def move(t: trtl.Turtle):
                 else:
                     trtl.done()
 
-        elif t.pos()[0] >= (LEFT * STEP):
-            wall = spawn_turtle(*t.pos(), t.heading())
-            wall.hideturtle()
-            wall.speed(0)
-            wall.color("gray")
-            wall.up()
-            wall.bk(STEP * .5)
-            wall.down()
-            wall.right(90)
-            wall.fd(STEP * .5)
-            wall.bk(STEP)
+        else:
+            scout.make_wall(return_home=False)
+            del scout
             t.undo()
-            t.undo()
+
+    # backtrack
     t.undo()
     t.undo()
-
-
-class WallException(Exception):
-    pass
-
-
-def increase_recursion_limit():
-    old = sys.getrecursionlimit()
-    sys.setrecursionlimit(old * 2)
 
 
 if __name__ == '__main__':
@@ -99,11 +102,20 @@ if __name__ == '__main__':
     root.withdraw()
 
     trtl.delay(0)
+    trtl.listen()
+    trtl.onkey(trtl.bye, "space")
+    trtl.onkey(trtl.bye, "Escape")
+
     turtle = trtl.Turtle()
-    turtle.speed(3)
-    turtle.shape("turtle")
+    turtle.speed(0)
+    turtle.color("lightgrey")
+    # turtle.shape("turtle")
     turtle.hideturtle()
-    turtle.up()
+    # turtle.up()
     turtle.setundobuffer(10000000)
-    move(turtle)
-    trtl.done()
+
+    try:
+        move(turtle)
+        trtl.done()
+    except trtl.Terminator:
+        pass
