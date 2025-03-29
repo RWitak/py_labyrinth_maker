@@ -49,18 +49,6 @@ class Scout:
                 self.scout.undo()
 
 
-def free_field(x: float, y: float) -> bool:
-    x = round(x)
-    y = round(y)
-    if not (LEFT < x < RIGHT and TOP < y < BOTTOM):
-        return False
-
-    for p_x, p_y in waypoints:
-        if x == p_x and y == p_y:
-            return False
-    return True
-
-
 def move(t: trtl.Turtle) -> None:
     # TODO: Find better way to navigate with precision and awareness.
 
